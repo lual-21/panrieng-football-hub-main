@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageLayout } from '@/components/layout/PageLayout';
-import { Calendar, Clock, MapPin, Trophy, Filter } from 'lucide-react';
+import { Calendar, Clock, MapPin, Trophy, Filter, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-type Tab = 'upcoming' | 'results';
+// 1. Added 'live' as a valid tab type
+type Tab = 'live' | 'upcoming' | 'results';
 
 interface Team {
   id: string;
@@ -44,15 +45,22 @@ interface League {
 }
 
 const Matches = () => {
+  // 2. Defaulting to 'upcoming', but 'live' will highlight active matches
   const [activeTab, setActiveTab] = useState<Tab>('upcoming');
   const [matches, setMatches] = useState<Match[]>([]);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [selectedLeague, setSelectedLeague] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  // 3. Keep a live clock reference updating every minute to shift statuses dynamically
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     fetchLeagues();
     fetchMatches();
+
+    // Update internal clock every 60 seconds
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
   // Real-time subscription for matches updates
@@ -106,10 +114,35 @@ const Matches = () => {
     return true;
   });
 
-  const upcomingMatches = filteredMatches.filter(m => !m.is_completed);
+  // 4. Helper function to calculate if a match is running *right now*
+  const isMatchLiveNow = (match: Match) => {
+    if (match.is_completed) return false;
+    if (!match.match_date || !match.match_time) return false;
+
+    // Construct a full Date object for the match kickoff
+    const matchKickoff = new Date(`${match.match_date}T${match.match_time}`);
+    
+    // Assume a typical local match duration is roughly 2 hours (120 minutes)
+    const matchEnd = new Date(matchKickoff.getTime() + 120 * 60 * 1000);
+
+    return currentTime >= matchKickoff && currentTime <= matchEnd;
+  };
+
+  // 5. Filter the matches array accurately using the active calendar timestamp
+  const liveMatches = filteredMatches.filter(m => !m.is_completed && isMatchLiveNow(m));
+  const upcomingMatches = filteredMatches.filter(m => !m.is_completed && !isMatchLiveNow(m));
   const completedMatches = filteredMatches.filter(m => m.is_completed).reverse();
 
-  const MatchCard = ({ match, isResult = false }: { match: Match; isResult?: boolean }) => {
+  // Switch tabs cleanly if a match suddenly shifts states
+  const getDisplayMatches = () => {
+    if (activeTab === 'live') return liveMatches;
+    if (activeTab === 'upcoming') return upcomingMatches;
+    return completedMatches;
+  };
+
+  const currentDisplayMatches = getDisplayMatches();
+
+  const MatchCard = ({ match, status }: { match: Match; status: Tab }) => {
     const homeTeam = match.home_team;
     const awayTeam = match.away_team;
     const motmPlayer = match.motm_player;
@@ -118,9 +151,12 @@ const Matches = () => {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-card rounded-xl border border-border/50 p-4 card-hover"
+        className={cn(
+          "bg-gradient-card rounded-xl border p-4 card-hover relative overflow-hidden",
+          status === 'live' ? "border-red-500/40 bg-red-950/5" : "border-border/50"
+        )}
       >
-        {/* Date and venue */}
+        {/* Date, venue, and live indicators */}
         <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-3">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
@@ -128,7 +164,14 @@ const Matches = () => {
             <Clock className="w-3 h-3 ml-2" />
             <span>{match.match_time?.slice(0, 5)}</span>
           </div>
-          {isResult && (
+          
+          {status === 'live' && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 font-bold tracking-wider animate-pulse text-[9px]">
+              <Radio className="w-2.5 h-2.5" /> LIVE
+            </span>
+          )}
+
+          {status === 'results' && (
             <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px]">
               FT
             </span>
@@ -149,20 +192,23 @@ const Matches = () => {
           </div>
 
           <div className="px-4">
-            {isResult ? (
+            {/* Show score layout for both Completed AND Active Live matches */}
+            {status !== 'upcoming' ? (
               <div className="flex items-center gap-2">
                 <span className={cn(
                   "text-2xl font-display",
+                  status === 'live' ? "text-foreground font-bold" :
                   (match.home_score ?? 0) > (match.away_score ?? 0) ? "text-victory" : (match.home_score ?? 0) < (match.away_score ?? 0) ? "text-defeat" : "text-draw"
                 )}>
-                  {match.home_score}
+                  {match.home_score ?? 0}
                 </span>
                 <span className="text-muted-foreground">-</span>
                 <span className={cn(
                   "text-2xl font-display",
+                  status === 'live' ? "text-foreground font-bold" :
                   (match.away_score ?? 0) > (match.home_score ?? 0) ? "text-victory" : (match.away_score ?? 0) < (match.home_score ?? 0) ? "text-defeat" : "text-draw"
                 )}>
-                  {match.away_score}
+                  {match.away_score ?? 0}
                 </span>
               </div>
             ) : (
@@ -189,7 +235,7 @@ const Matches = () => {
         </div>
 
         {/* MOTM for results */}
-        {isResult && motmPlayer && (
+        {status === 'results' && motmPlayer && (
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex items-center justify-center gap-2">
               <Trophy className="w-3 h-3 text-gold" />
@@ -223,20 +269,30 @@ const Matches = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* 6. Updated Tab bar to cleanly support the Live filter tab */}
       <div className="flex gap-2 mb-4">
-        {(['upcoming', 'results'] as Tab[]).map((tab) => (
+        {([
+          { id: 'live', label: `Live (${liveMatches.length})` },
+          { id: 'upcoming', label: 'Upcoming' },
+          { id: 'results', label: 'Results' }
+        ] as { id: Tab; label: string }[]).map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200",
-              activeTab === tab
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              "flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200 relative",
+              activeTab === tab.id
+                ? tab.id === 'live' 
+                  ? "bg-red-600 text-white font-bold" 
+                  : "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+              tab.id === 'live' && liveMatches.length > 0 && activeTab !== 'live' && "ring-2 ring-red-500/50"
             )}
           >
-            {tab === 'upcoming' ? 'Upcoming' : 'Results'}
+            {tab.label}
+            {tab.id === 'live' && liveMatches.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+            )}
           </button>
         ))}
       </div>
@@ -255,21 +311,17 @@ const Matches = () => {
             <div className="flex justify-center py-8">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : activeTab === 'upcoming' ? (
-            upcomingMatches.length > 0 ? (
-              upcomingMatches.map((match) => (
-                <MatchCard key={match.id} match={match} />
-              ))
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No upcoming matches</p>
-            )
           ) : (
-            completedMatches.length > 0 ? (
-              completedMatches.map((match) => (
-                <MatchCard key={match.id} match={match} isResult />
+            currentDisplayMatches.length > 0 ? (
+              currentDisplayMatches.map((match) => (
+                <MatchCard key={match.id} match={match} status={activeTab} />
               ))
             ) : (
-              <p className="text-center text-muted-foreground py-8">No completed matches</p>
+              <p className="text-center text-muted-foreground py-8">
+                {activeTab === 'live' && "No matches are playing right now"}
+                {activeTab === 'upcoming' && "No upcoming matches"}
+                {activeTab === 'results' && "No completed matches"}
+              </p>
             )
           )}
         </motion.div>
