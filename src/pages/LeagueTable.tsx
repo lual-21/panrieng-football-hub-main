@@ -175,86 +175,102 @@ const LeagueTable = () => {
       {/* Points-Based League Table */}
       {!isKnockout && (
         <>
-          <div className="rounded-xl bg-gradient-card border border-border/50 overflow-hidden">
-            {/* Header */}
-            <div className="grid grid-cols-[auto_1fr_repeat(4,_auto)] gap-2 px-4 py-3 bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase">
-              <span className="w-5">#</span>
-              <span>Team</span>
-              <span className="w-6 text-center">P</span>
-              <span className="w-6 text-center">GD</span>
-              <span className="w-8 text-center">Pts</span>
-            </div>
-
-            {/* Rows */}
-            {teams?.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>No teams found in this league.</p>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <div className="min-w-[640px] rounded-xl bg-gradient-card border border-border/50 overflow-hidden">
+              {/* Header - FIFA standard columns */}
+              <div className="grid grid-cols-[36px_1fr_repeat(8,_40px)] gap-2 px-4 py-3.5 bg-secondary/60 border-b-2 border-b-primary/30 text-xs font-display uppercase tracking-wider text-muted-foreground">
+                <span className="text-foreground">#</span>
+                <span className="text-foreground">Team</span>
+                <span className="text-center" title="Played">P</span>
+                <span className="text-center" title="Won">W</span>
+                <span className="text-center" title="Drawn">D</span>
+                <span className="text-center" title="Lost">L</span>
+                <span className="text-center" title="Goals For">GF</span>
+                <span className="text-center" title="Goals Against">GA</span>
+                <span className="text-center" title="Goal Difference">GD</span>
+                <span className="text-center text-foreground" title="Points">Pts</span>
               </div>
-            )}
-            {teams?.map((team, index) => (
-              <motion.div
-                key={team.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className={cn(
-                  "grid grid-cols-[auto_1fr_repeat(4,_auto)] gap-2 px-4 py-3 items-center border-t border-border/30",
-                  index === 0 && "bg-primary/10",
-                  index < 3 && "border-l-2 border-l-primary"
-                )}
-              >
-                <span className={cn(
-                  "w-5 text-sm font-display",
-                  index === 0 ? "text-gold" : index < 3 ? "text-primary" : "text-muted-foreground"
-                )}>
-                  {index + 1}
-                </span>
 
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-sm flex-shrink-0 overflow-hidden">
-                    {team.logo_url ? (
-                      <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xs font-display text-muted-foreground">{team.short_name?.charAt(0)}</span>
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-foreground truncate">
-                    {team.short_name}
-                  </span>
+              {/* Rows */}
+              {teams?.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>No teams found in this league.</p>
                 </div>
+              )}
+              {teams?.map((team, index) => (
+                <motion.div
+                  key={team.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={cn(
+                    "grid grid-cols-[36px_1fr_repeat(8,_40px)] gap-2 px-4 py-3.5 items-center border-t border-border/20",
+                    "even:bg-muted/10 hover:bg-muted/20 transition-colors",
+                    index === 0 && "bg-gold/5 border-l-2 border-l-gold",
+                    index === 1 && "bg-primary/5 border-l-2 border-l-primary",
+                    index === 2 && "bg-primary/5 border-l-2 border-l-primary/60"
+                  )}
+                >
+                  <span className={cn(
+                    "text-sm font-display tabular-nums",
+                    index === 0 ? "text-gold" : index < 3 ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    {index + 1}
+                  </span>
 
-                <span className="w-6 text-center text-sm text-foreground">{team.played || 0}</span>
-                
-                <span className={cn(
-                  "w-6 text-center text-sm font-medium",
-                  team.goalDifference > 0 ? "text-victory" : 
-                  team.goalDifference < 0 ? "text-defeat" : "text-draw"
-                )}>
-                  {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
-                </span>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm flex-shrink-0 overflow-hidden border border-border/40">
+                      {team.logo_url ? (
+                        <img src={team.logo_url} alt={team.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-display text-muted-foreground">{team.short_name?.charAt(0)}</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-foreground truncate">
+                      {team.short_name}
+                    </span>
+                  </div>
 
-                <span className="w-8 text-center text-sm font-display text-foreground font-semibold">
-                  {team.points}
-                </span>
-              </motion.div>
-            ))}
+                  <span className="text-center text-sm text-foreground tabular-nums">{team.played || 0}</span>
+                  <span className="text-center text-sm text-victory tabular-nums">{team.won || 0}</span>
+                  <span className="text-center text-sm text-draw tabular-nums">{team.drawn || 0}</span>
+                  <span className="text-center text-sm text-defeat tabular-nums">{team.lost || 0}</span>
+                  <span className="text-center text-sm text-foreground tabular-nums">{team.goals_for || 0}</span>
+                  <span className="text-center text-sm text-foreground tabular-nums">{team.goals_against || 0}</span>
+                  <span className={cn(
+                    "text-center text-sm font-medium tabular-nums",
+                    team.goalDifference > 0 ? "text-victory" :
+                    team.goalDifference < 0 ? "text-defeat" : "text-muted-foreground"
+                  )}>
+                    {team.goalDifference > 0 ? '+' : ''}{team.goalDifference}
+                  </span>
+                  <span className="text-center text-base font-display text-foreground font-bold tabular-nums">
+                    {team.points}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
           </div>
 
           {/* Legend */}
-          <div className="mt-4 flex flex-wrap gap-4 text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-primary" />
-              <span>Champion / Top 3</span>
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-gold" />
+              <span>Champion</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-primary" />
+              <span>Top 3</span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-victory" />
               <span>Win</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-draw" />
               <span>Draw</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full bg-defeat" />
               <span>Loss</span>
             </div>
